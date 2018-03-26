@@ -1,0 +1,114 @@
+import scala.util.parsing.combinator._
+
+
+abstract class MatchTree
+case class S(e: MatchTree) extends MatchTree
+case class E(t: MatchTree, e2: MatchTree) extends MatchTree
+case class E2(e: MatchTree) extends MatchTree
+case class T(f: MatchTree, t2: MatchTree) extends MatchTree
+case class T2(f: MatchTree, t2: MatchTree) extends MatchTree
+case class F(a: MatchTree, f2: MatchTree) extends MatchTree
+case class F2(f2: MatchTree) extends MatchTree
+case class A(e: MatchTree) extends MatchTree
+case class C(content: String) extends MatchTree
+case class NULL() extends MatchTree
+
+class patternParser extends JavaTokenParsers{
+  def s: Parser[MatchTree] = e ^^ {case ex => S(ex)}
+  def e: Parser[MatchTree] = t ~ e2 ^^ {case te ~ ex2 => if (ex2.isInstanceOf[NULL]) te else E(te, ex2)}
+  def e2: Parser[MatchTree] = or ~ e ^^ {case or ~ ex => E2(ex)} | "" ^^ {case "" => NULL()}
+  def t: Parser[MatchTree] = f ~ t2 ^^ {case fe ~ te2 => if (te2.isInstanceOf[NULL]) fe else T(fe, te2)}
+  def t2: Parser[MatchTree] = f ~ t2 ^^ {case fe ~ te2 => T2(fe, te2)} | "" ^^ {case "" => NULL()}
+  def f: Parser[MatchTree] = a ~ f2 ^^ {case ae ~ fe2 => if (fe2.isInstanceOf[NULL]) ae else F(ae, fe2)}
+  def f2: Parser[MatchTree] = optional ~ f2 ^^ {case opt ~ fe2 => F2(fe2)} | "" ^^ {case "" => NULL()}
+  def a: Parser[MatchTree] = parenOpen ~ e ~ parenClose ^^ {case po ~ ex ~ pc => A(ex)} | c ^^ {case ch => A(ch)}
+  def or[MatchTree] = "|"
+  def optional[MatchTree] = "?"
+  def parenOpen[MatchTree] = "("
+  def parenClose[MatchTree] = ")"
+  def c: Parser[C] = ("0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "a" | "b" | "c" | "d" |
+    "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m" | "n" | "o" | "p" | "q" | "r" | "s" | "t"
+    | "u" | "v" | "w" | "x" | "y" | "z" | "." ) ^^ {case ch => C(ch)}
+}
+
+object REparser extends patternParser{
+
+  def patternMatch(pat: MatchTree, inp: MatchTree): Boolean ={
+
+    pat match {
+
+      case S(a) => inp match {
+        case S(b) => patternMatch(a, b)
+        case _ => false
+      }
+
+      case E(x, E2(y)) => inp match {
+        case T(a, T2(b, c)) => patternMatch(x, inp) | patternMatch(y, inp)
+        case A(z) => patternMatch(x, A(z)) | patternMatch(y, inp)
+        case _ => false
+      }
+
+      case T(g, h) => inp match {
+        case T(i, j) => patternMatch(g, inp) | patternMatch(h, j)
+        case _ => false
+      }
+
+      case E2(k) => inp match {
+        case E2(l) => patternMatch(k, l)
+
+        case _ => false
+      }
+
+      case T2(m, NULL()) => inp match {
+        case T2(a, NULL()) => patternMatch(m, a)
+        case _ => false
+      }
+
+      case T2(m, n) => inp match {
+        case T2(o, p) => patternMatch(m, inp) | patternMatch(n, p)
+        case _ => false
+      }
+
+      case F(q, r) => inp match {
+        case T2(s, t) => patternMatch(q, s) | patternMatch(r, t)
+        case A(e) => patternMatch(q, inp)
+        case _ => false
+      }
+
+      case F2(u) => inp match {
+        case NULL() => true
+        case _ => false
+      }
+
+      case A(w) => inp match {
+        case A(x) => patternMatch(w, x)
+        case T(f, t2) => patternMatch(w, inp)
+        case _ => false
+      }
+
+      case C(y) => inp match {
+        case C(z) => y.equals(z) | y.equals(".")
+        case _ => false
+      }
+
+      case NULL() => inp match {
+        case NULL() => true
+        case _ => false
+      }
+    }
+  }
+
+  def main(args: Array[String]) {
+
+    val pattern = parseAll(s,scala.io.StdIn.readLine("Enter pattern: ")).get 
+    var input = parseAll(s,scala.io.StdIn.readLine("Input: ").toLowerCase).get
+    while (input != "!q") {
+      if (patternMatch(pattern, input) == false) {
+        println("no match")
+      } else{
+          println("match")
+      }
+      input = parseAll(s,scala.io.StdIn.readLine("Input: ").toLowerCase).get
+    }
+  }
+}
